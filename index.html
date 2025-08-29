@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Star Realms Score Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: black;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .player {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #444;
+    }
+
+    .player2 {
+      transform: rotate(180deg);
+    }
+
+    .stat {
+      margin: 10px 0;
+      text-align: center;
+    }
+
+    .label {
+      font-size: 1.2em;
+      margin-bottom: 5px;
+    }
+
+    .value {
+      font-size: 2.5em;
+      margin: 5px;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    button {
+      padding: 5px 15px;
+      font-size: 1.5em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .authority { color: limegreen; }
+    .combat { color: red; }
+    .trade { color: gold; }
+    .discards { color: grey; }
+
+    .endturn {
+      margin-top: 20px;
+      font-size: 1.2em;
+      background: #333;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+    }
+
+    .change {
+      font-size: 1.2em;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Player 1 -->
+  <div class="player" id="player1">
+    <h2>Player 1</h2>
+    <div class="stat authority">
+      <div class="label">Authority</div>
+      <div class="value" id="p1-authority">50</div>
+      <div class="buttons">
+        <button onclick="updateStat('p1','authority',-1)">-</button>
+        <button onclick="updateStat('p1','authority',1)">+</button>
+      </div>
+      <div class="change" id="p1-authority-change">0</div>
+    </div>
+
+    <div class="stat combat">
+      <div class="label">Combat</div>
+      <div class="value" id="p1-combat">0</div>
+      <div class="buttons">
+        <button onclick="updateStat('p1','combat',-1)">-</button>
+        <button onclick="updateStat('p1','combat',1)">+</button>
+      </div>
+      <div class="change" id="p1-combat-change">0</div>
+    </div>
+
+    <div class="stat trade">
+      <div class="label">Trade</div>
+      <div class="value" id="p1-trade">0</div>
+      <div class="buttons">
+        <button onclick="updateStat('p1','trade',-1)">-</button>
+        <button onclick="updateStat('p1','trade',1)">+</button>
+      </div>
+      <div class="change" id="p1-trade-change">0</div>
+    </div>
+
+    <div class="stat discards">
+      <div class="label">Discards</div>
+      <div class="value" id="p1-discards">0</div>
+      <div class="buttons">
+        <button onclick="updateStat('p1','discards',-1)">-</button>
+        <button onclick="updateStat('p1','discards',1)">+</button>
+      </div>
+      <div class="change" id="p1-discards-change">0</div>
+    </div>
+
+    <button class="endturn" onclick="endTurn('p1')">End Turn</button>
+  </div>
+
+  <!-- Player 2 -->
+  <div class="player player2" id="player2">
+    <h2>Player 2</h2>
+    <div class="stat authority">
+      <div class="label">Authority</div>
+      <div class="value" id="p2-authority">50</div>
+      <div class="buttons">
+        <button onclick="updateStat('p2','authority',-1)">-</button>
+        <button onclick="updateStat('p2','authority',1)">+</button>
+      </div>
+      <div class="change" id="p2-authority-change">0</div>
+    </div>
+
+    <div class="stat combat">
+      <div class="label">Combat</div>
+      <div class="value" id="p2-combat">0</div>
+      <div class="buttons">
+        <button onclick="updateStat('p2','combat',-1)">-</button>
+        <button onclick="updateStat('p2','combat',1)">+</button>
+      </div>
+      <div class="change" id="p2-combat-change">0</div>
+    </div>
+
+    <div class="stat trade">
+      <div class="label">Trade</div>
+      <div class="value" id="p2-trade">0</div>
+      <div class="buttons">
+        <button onclick="updateStat('p2','trade',-1)">-</button>
+        <button onclick="updateStat('p2','trade',1)">+</button>
+      </div>
+      <div class="change" id="p2-trade-change">0</div>
+    </div>
+
+    <div class="stat discards">
+      <div class="label">Discards</div>
+      <div class="value" id="p2-discards">0</div>
+      <div class="buttons">
+        <button onclick="updateStat('p2','discards',-1)">-</button>
+        <button onclick="updateStat('p2','discards',1)">+</button>
+      </div>
+      <div class="change" id="p2-discards-change">0</div>
+    </div>
+
+    <button class="endturn" onclick="endTurn('p2')">End Turn</button>
+  </div>
+
+  <script>
+    const stats = {
+      p1: { authority: 50, combat: 0, trade: 0, discards: 0, changes: {authority:0,combat:0,trade:0,discards:0} },
+      p2: { authority: 50, combat: 0, trade: 0, discards: 0, changes: {authority:0,combat:0,trade:0,discards:0} }
+    };
+
+    function updateStat(player, type, amount) {
+      stats[player][type] += amount;
+      stats[player].changes[type] += amount;
+      document.getElementById(`${player}-${type}`).innerText = stats[player][type];
+      document.getElementById(`${player}-${type}-change`).innerText = stats[player].changes[type];
+    }
+
+    function endTurn(player) {
+      ["combat", "trade", "discards"].forEach(type => {
+        stats[player][type] = 0;
+        stats[player].changes[type] = 0;
+        document.getElementById(`${player}-${type}`).innerText = 0;
+        document.getElementById(`${player}-${type}-change`).innerText = 0;
+      });
+    }
+  </script>
+
+</body>
+</html>
