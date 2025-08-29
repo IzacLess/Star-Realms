@@ -11,7 +11,7 @@
       background: black;
       color: white;
       display: flex;
-      flex-direction: column;
+      flex-direction: row; /* landscape split */
       height: 100vh;
     }
 
@@ -27,6 +27,10 @@
 
     .player2 {
       transform: rotate(180deg);
+    }
+
+    h2 {
+      margin-bottom: 10px;
     }
 
     .stat {
@@ -186,10 +190,13 @@
     }
 
     function endTurn(player) {
-      ["combat", "trade", "discards"].forEach(type => {
-        stats[player][type] = 0;
+      ["authority","combat", "trade", "discards"].forEach(type => {
+        if (type !== "authority") {
+          stats[player][type] = 0;
+          document.getElementById(`${player}-${type}`).innerText = 0;
+        }
+        // always reset change trackers
         stats[player].changes[type] = 0;
-        document.getElementById(`${player}-${type}`).innerText = 0;
         document.getElementById(`${player}-${type}-change`).innerText = 0;
       });
     }
