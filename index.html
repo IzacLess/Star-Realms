@@ -1,206 +1,445 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Star Realms Score Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Russo+One&display=swap" rel="stylesheet" />
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: black;
-      color: white;
-      display: flex;
-      flex-direction: row; /* landscape split */
-      height: 100vh;
+    :root{
+      --bg-deep:#05070b;
+      --panel:#0e1320;
+      --panel-glow:#1c2540;
+      --white:#ffffff;
+      --green:#3CF06E; /* Authority */
+      --red:#FF3B3B;   /* Combat */
+      --yellow:#FFD34D;/* Trade */
+      --grey:#9aa0a6;  /* Discards */
+      --blue:#4DA3FF;  /* End Turn */
     }
 
-    .player {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 10px;
-      border: 1px solid #444;
+    *{box-sizing:border-box}
+    html,body{height:100%;}
+    body{
+      margin:0;
+      font-family:'Russo One',system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial, sans-serif;
+      background: var(--bg-deep);
+      color:var(--white);
+      overflow:hidden;
     }
 
-    .player2 {
-      transform: rotate(180deg);
+    /* Starfield canvas behind everything */
+    #starfield{position:fixed;inset:0;z-index:0;}
+
+    /* App layout: two side-by-side panels, mobile landscape first */
+    .app{
+      position:relative;z-index:1;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:0;
+      height:100vh;
+      width:100vw;
     }
 
-    h2 {
-      margin-bottom: 10px;
+    .player{
+      position:relative;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
+      border-left:2px solid rgba(255,255,255,0.06);
+    }
+    .player:first-child{border-left:none;border-right:2px solid rgba(255,255,255,0.06);}    
+
+    /* Turn indicator pulse */
+    .active{
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), 0 0 32px 6px rgba(77,163,255,0.25);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse{0%,100%{box-shadow: inset 0 0 0 2px rgba(255,255,255,0.06), 0 0 18px 2px rgba(77,163,255,0.18);}50%{box-shadow: inset 0 0 0 2px rgba(255,255,255,0.12), 0 0 36px 10px rgba(77,163,255,0.35);}}
+
+    .player .title{letter-spacing:1px;opacity:.95;margin-bottom:4px;font-size:1.3rem;text-align:center}
+    .authority{
+      display:flex;align-items:center;justify-content:center;gap:12px;
+      margin:8px 0 14px 0;
+    }
+    .authority .label{font-size:1.2rem;color:var(--green);opacity:.95}
+    .authority .value{font-size:min(14vw,6rem);line-height:1;color:#fff;text-shadow: 0 0 12px rgba(60,240,110,0.35);}    
+    .authority .change{min-width:2.2rem;text-align:center;color:var(--green);opacity:.8}
+
+    /* Stat blocks grid (2x2) */
+    .grid{
+      width:min(92%,560px);
+      display:grid;grid-template-columns:1fr 1fr;gap:14px;
     }
 
-    .stat {
-      margin: 10px 0;
-      text-align: center;
+    .stat{
+      background: linear-gradient(180deg, rgba(30,37,51,0.9), rgba(20,26,39,0.9));
+      border:2px solid rgba(255,255,255,0.08);
+      border-radius:16px;
+      padding:12px 10px;
+      text-align:center;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45), 0 0 18px rgba(255,255,255,0.06) inset;
     }
 
-    .label {
-      font-size: 1.2em;
-      margin-bottom: 5px;
+    .stat .heading{font-size:1rem;letter-spacing:.5px;margin-bottom:6px}
+    .stat .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .stat .value{font-size:2.2rem;min-width:3.6ch}
+    .stat .change{font-size:1rem;opacity:.75;min-width:2ch;text-align:center}
+
+    /* Color accents per stat */
+    .combat .heading{color:var(--red)}
+    .trade  .heading{color:var(--yellow)}
+    .discards .heading{color:var(--grey)}
+
+    /* End turn expands across two columns */
+    .endturn{grid-column:1/span 2;background:linear-gradient(180deg, rgba(30,37,51,0.95), rgba(20,26,39,0.95));}
+
+    /* Buttons */
+    button{font-family:inherit;color:#fff;border:none;cursor:pointer;user-select:none}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:42px;border-radius:12px;
+      background:#151b2a;outline:2px solid rgba(255,255,255,0.14);
+      box-shadow:0 0 10px rgba(255,255,255,0.06) inset, 0 8px 16px rgba(0,0,0,0.35);
+      font-size:1.4rem;transition:transform .08s ease, outline-color .2s ease, box-shadow .2s ease;
     }
+    .btn:active{transform:scale(.95)}
 
-    .value {
-      font-size: 2.5em;
-      margin: 5px;
+    .minus{outline-color:rgba(255,255,255,0.22)}
+    .plus{outline-color:rgba(255,255,255,0.22)}
+
+    /* End turn button style */
+    .btn-end{
+      padding:14px 16px;width:100%;border-radius:14px;font-size:1.4rem;letter-spacing:.8px;
+      background:#1b2233;outline:2px solid rgba(255,255,255,0.14);
+      transition:box-shadow .25s ease, transform .06s ease;
     }
+    .btn-end:active{transform:scale(.98)}
+    .btn-end.attack{outline-color: rgba(255,59,59,0.7);box-shadow:0 0 18px rgba(255,59,59,0.35);} /* pulse when attack */
+    .attack{animation:attackPulse 1.2s ease-in-out infinite}
+    @keyframes attackPulse{0%,100%{box-shadow:0 0 12px rgba(255,59,59,0.28);}50%{box-shadow:0 0 26px rgba(255,59,59,0.55);}}
 
-    .buttons {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-    }
+    /* Player 2 flipped for across-the-table use */
+    .flip{transform:rotate(180deg)}
 
-    button {
-      padding: 5px 15px;
-      font-size: 1.5em;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
+    /* Winner overlay */
+    #overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:3;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:24px}
+    #overlay h1{font-size:min(12vw,5rem);margin:0 0 12px;text-shadow:0 0 20px rgba(255,255,255,0.35)}
+    #overlay .sub{opacity:.85;margin-bottom:18px;letter-spacing:.8px}
+    #overlay .newgame{padding:14px 20px;border-radius:14px;background:#1b2233;outline:2px solid rgba(255,255,255,0.22);font-size:1.2rem}
 
-    .authority { color: limegreen; }
-    .combat { color: red; }
-    .trade { color: gold; }
-    .discards { color: grey; }
+    /* Fireworks canvas is above overlay (so it shows in front) */
+    #fireworks{position:fixed;inset:0;z-index:4;pointer-events:none}
 
-    .endturn {
-      margin-top: 20px;
-      font-size: 1.2em;
-      background: #333;
-      color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
-    }
-
-    .change {
-      font-size: 1.2em;
-      opacity: 0.7;
+    /* Responsiveness tweaks */
+    @media (max-width: 900px){
+      .authority .value{font-size:min(18vw,5.2rem)}
+      .stat .value{font-size:2rem}
+      .btn{min-width:40px;height:40px}
     }
   </style>
 </head>
 <body>
+  <!-- Canvases -->
+  <canvas id="starfield"></canvas>
 
-  <!-- Player 1 -->
-  <div class="player" id="player1">
-    <h2>Player 1</h2>
-    <div class="stat authority">
-      <div class="label">Authority</div>
-      <div class="value" id="p1-authority">50</div>
-      <div class="buttons">
-        <button onclick="updateStat('p1','authority',-1)">-</button>
-        <button onclick="updateStat('p1','authority',1)">+</button>
+  <div class="app" id="app">
+    <!-- Player 1 -->
+    <section id="p1" class="player active">
+      <div class="title">PLAYER 1</div>
+      <div class="authority">
+        <div class="label">AUTHORITY</div>
+        <div class="value" id="p1-authority">50</div>
+        <div class="change" id="p1-authority-change">0</div>
       </div>
-      <div class="change" id="p1-authority-change">0</div>
-    </div>
 
-    <div class="stat combat">
-      <div class="label">Combat</div>
-      <div class="value" id="p1-combat">0</div>
-      <div class="buttons">
-        <button onclick="updateStat('p1','combat',-1)">-</button>
-        <button onclick="updateStat('p1','combat',1)">+</button>
+      <div class="grid">
+        <!-- Combat -->
+        <div class="stat combat">
+          <div class="heading">COMBAT</div>
+          <div class="row">
+            <button class="btn minus" data-player="p1" data-type="combat" data-delta="-1">−</button>
+            <div class="value" id="p1-combat">0</div>
+            <button class="btn plus" data-player="p1" data-type="combat" data-delta="1">+</button>
+          </div>
+          <div class="change" id="p1-combat-change">0</div>
+        </div>
+
+        <!-- Trade -->
+        <div class="stat trade">
+          <div class="heading">TRADE</div>
+          <div class="row">
+            <button class="btn minus" data-player="p1" data-type="trade" data-delta="-1">−</button>
+            <div class="value" id="p1-trade">0</div>
+            <button class="btn plus" data-player="p1" data-type="trade" data-delta="1">+</button>
+          </div>
+          <div class="change" id="p1-trade-change">0</div>
+        </div>
+
+        <!-- Discards -->
+        <div class="stat discards">
+          <div class="heading">DISCARDS</div>
+          <div class="row">
+            <button class="btn minus" data-player="p1" data-type="discards" data-delta="-1">−</button>
+            <div class="value" id="p1-discards">0</div>
+            <button class="btn plus" data-player="p1" data-type="discards" data-delta="1">+</button>
+          </div>
+          <div class="change" id="p1-discards-change">0</div>
+        </div>
+
+        <!-- End Turn / Attack -->
+        <div class="stat endturn">
+          <button id="p1-end" class="btn-end" data-player="p1">END TURN</button>
+        </div>
       </div>
-      <div class="change" id="p1-combat-change">0</div>
-    </div>
+    </section>
 
-    <div class="stat trade">
-      <div class="label">Trade</div>
-      <div class="value" id="p1-trade">0</div>
-      <div class="buttons">
-        <button onclick="updateStat('p1','trade',-1)">-</button>
-        <button onclick="updateStat('p1','trade',1)">+</button>
+    <!-- Player 2 (flipped) -->
+    <section id="p2" class="player flip">
+      <div class="title">PLAYER 2</div>
+      <div class="authority">
+        <div class="label">AUTHORITY</div>
+        <div class="value" id="p2-authority">50</div>
+        <div class="change" id="p2-authority-change">0</div>
       </div>
-      <div class="change" id="p1-trade-change">0</div>
-    </div>
 
-    <div class="stat discards">
-      <div class="label">Discards</div>
-      <div class="value" id="p1-discards">0</div>
-      <div class="buttons">
-        <button onclick="updateStat('p1','discards',-1)">-</button>
-        <button onclick="updateStat('p1','discards',1)">+</button>
+      <div class="grid">
+        <div class="stat combat">
+          <div class="heading">COMBAT</div>
+          <div class="row">
+            <button class="btn minus" data-player="p2" data-type="combat" data-delta="-1">−</button>
+            <div class="value" id="p2-combat">0</div>
+            <button class="btn plus" data-player="p2" data-type="combat" data-delta="1">+</button>
+          </div>
+          <div class="change" id="p2-combat-change">0</div>
+        </div>
+
+        <div class="stat trade">
+          <div class="heading">TRADE</div>
+          <div class="row">
+            <button class="btn minus" data-player="p2" data-type="trade" data-delta="-1">−</button>
+            <div class="value" id="p2-trade">0</div>
+            <button class="btn plus" data-player="p2" data-type="trade" data-delta="1">+</button>
+          </div>
+          <div class="change" id="p2-trade-change">0</div>
+        </div>
+
+        <div class="stat discards">
+          <div class="heading">DISCARDS</div>
+          <div class="row">
+            <button class="btn minus" data-player="p2" data-type="discards" data-delta="-1">−</button>
+            <div class="value" id="p2-discards">0</div>
+            <button class="btn plus" data-player="p2" data-type="discards" data-delta="1">+</button>
+          </div>
+          <div class="change" id="p2-discards-change">0</div>
+        </div>
+
+        <div class="stat endturn">
+          <button id="p2-end" class="btn-end" data-player="p2">END TURN</button>
+        </div>
       </div>
-      <div class="change" id="p1-discards-change">0</div>
-    </div>
-
-    <button class="endturn" onclick="endTurn('p1')">End Turn</button>
+    </section>
   </div>
 
-  <!-- Player 2 -->
-  <div class="player player2" id="player2">
-    <h2>Player 2</h2>
-    <div class="stat authority">
-      <div class="label">Authority</div>
-      <div class="value" id="p2-authority">50</div>
-      <div class="buttons">
-        <button onclick="updateStat('p2','authority',-1)">-</button>
-        <button onclick="updateStat('p2','authority',1)">+</button>
-      </div>
-      <div class="change" id="p2-authority-change">0</div>
-    </div>
-
-    <div class="stat combat">
-      <div class="label">Combat</div>
-      <div class="value" id="p2-combat">0</div>
-      <div class="buttons">
-        <button onclick="updateStat('p2','combat',-1)">-</button>
-        <button onclick="updateStat('p2','combat',1)">+</button>
-      </div>
-      <div class="change" id="p2-combat-change">0</div>
-    </div>
-
-    <div class="stat trade">
-      <div class="label">Trade</div>
-      <div class="value" id="p2-trade">0</div>
-      <div class="buttons">
-        <button onclick="updateStat('p2','trade',-1)">-</button>
-        <button onclick="updateStat('p2','trade',1)">+</button>
-      </div>
-      <div class="change" id="p2-trade-change">0</div>
-    </div>
-
-    <div class="stat discards">
-      <div class="label">Discards</div>
-      <div class="value" id="p2-discards">0</div>
-      <div class="buttons">
-        <button onclick="updateStat('p2','discards',-1)">-</button>
-        <button onclick="updateStat('p2','discards',1)">+</button>
-      </div>
-      <div class="change" id="p2-discards-change">0</div>
-    </div>
-
-    <button class="endturn" onclick="endTurn('p2')">End Turn</button>
+  <!-- Winner overlay and fireworks (front layer) -->
+  <div id="overlay">
+    <h1 id="winner-text">PLAYER 1 WINS!</h1>
+    <div class="sub">Tap to start a new game</div>
+    <button class="newgame" id="newgame">NEW GAME</button>
   </div>
+  <canvas id="fireworks"></canvas>
+
+  <!-- Sounds -->
+  <audio id="s-click" src="https://actions.google.com/sounds/v1/impacts/wood_plank_flicks.ogg" preload="auto"></audio>
+  <audio id="s-end"   src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
+  <audio id="s-win"   src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
 
   <script>
-    const stats = {
-      p1: { authority: 50, combat: 0, trade: 0, discards: 0, changes: {authority:0,combat:0,trade:0,discards:0} },
-      p2: { authority: 50, combat: 0, trade: 0, discards: 0, changes: {authority:0,combat:0,trade:0,discards:0} }
+    // ---------- STATE ----------
+    const state = {
+      current:'p1',
+      p1:{authority:50, combat:0, trade:0, discards:0, changes:{authority:0,combat:0,trade:0,discards:0}},
+      p2:{authority:50, combat:0, trade:0, discards:0, changes:{authority:0,combat:0,trade:0,discards:0}},
+      winner:null
     };
 
-    function updateStat(player, type, amount) {
-      stats[player][type] += amount;
-      stats[player].changes[type] += amount;
-      document.getElementById(`${player}-${type}`).innerText = stats[player][type];
-      document.getElementById(`${player}-${type}-change`).innerText = stats[player].changes[type];
-    }
+    const ids = (p,t) => `${p}-${t}`;
+    const byId = id => document.getElementById(id);
 
-    function endTurn(player) {
-      ["authority","combat", "trade", "discards"].forEach(type => {
-        if (type !== "authority") {
-          stats[player][type] = 0;
-          document.getElementById(`${player}-${type}`).innerText = 0;
-        }
-        // always reset change trackers
-        stats[player].changes[type] = 0;
-        document.getElementById(`${player}-${type}-change`).innerText = 0;
+    function play(id){ const a = byId(id); if(!a) return; try{ a.currentTime = 0; a.play(); }catch(e){} }
+
+    function render(){
+      ['p1','p2'].forEach(p=>{
+        ['authority','combat','trade','discards'].forEach(t=>{
+          byId(ids(p,t)).textContent = state[p][t];
+          byId(ids(p, t+'-change')).textContent = state[p].changes[t];
+        });
+      });
+      // Active panel pulse
+      document.querySelectorAll('.player').forEach(el=>el.classList.remove('active'));
+      byId(state.current).classList.add('active');
+      // End turn button text & attack pulse
+      ['p1','p2'].forEach(p=>{
+        const btn = byId(p+'-end');
+        const combat = state[p].combat;
+        btn.textContent = combat>0 ? 'ATTACK AND END TURN' : 'END TURN';
+        btn.classList.toggle('attack', combat>0 && state.current===p);
       });
     }
-  </script>
 
+    function bumpAuthorityVisual(p){
+      const el = byId(ids(p,'authority'));
+      el.style.transform = 'scale(1.08)';
+      el.style.transition = 'transform 120ms';
+      setTimeout(()=>{el.style.transform='scale(1)';},120);
+    }
+
+    // Handle +/- clicks
+    document.addEventListener('click', e=>{
+      const btn = e.target.closest('.btn');
+      if(!btn) return;
+      play('s-click');
+      const player = btn.getAttribute('data-player');
+      const type = btn.getAttribute('data-type');
+      const delta = parseInt(btn.getAttribute('data-delta'));
+      state[player][type] += delta;
+      state[player].changes[type] += delta;
+      if(type==='authority') bumpAuthorityVisual(player);
+      render();
+    });
+
+    // End Turn / Attack
+    byId('p1-end').addEventListener('click',()=>endTurn('p1'));
+    byId('p2-end').addEventListener('click',()=>endTurn('p2'));
+
+    function endTurn(p){
+      if(state.current!==p) return; // only active player can end
+      play('s-end');
+
+      const opponent = p==='p1' ? 'p2' : 'p1';
+      const combat = state[p].combat;
+      if(combat>0){
+        state[opponent].authority -= combat;
+        state[p].combat = 0;
+        state[p].changes.combat = 0;
+        bumpAuthorityVisual(opponent);
+      }
+      // Reset per-turn trackers
+      ['trade','discards'].forEach(t=>{ state[p][t]=0; state[p].changes[t]=0; });
+      // Authority change tracker also resets each end turn
+      state[p].changes.authority = 0;
+
+      // Check win condition AFTER applying combat
+      if(state[opponent].authority <= 0){
+        state.winner = p;
+        showWinner(p);
+      } else {
+        // switch turns
+        state.current = opponent;
+      }
+      render();
+    }
+
+    // New game
+    byId('newgame').addEventListener('click', newGame);
+    function newGame(){
+      Object.assign(state, {
+        current:'p1', winner:null,
+        p1:{authority:50, combat:0, trade:0, discards:0, changes:{authority:0,combat:0,trade:0,discards:0}},
+        p2:{authority:50, combat:0, trade:0, discards:0, changes:{authority:0,combat:0,trade:0,discards:0}}
+      });
+      byId('overlay').style.display='none';
+      stopFireworks();
+      render();
+    }
+
+    // Winner overlay & fireworks
+    function showWinner(attacker){
+      const loser = attacker==='p1' ? 'p2' : 'p1';
+      byId('winner-text').textContent = attacker==='p1' ? 'PLAYER 1 WINS!' : 'PLAYER 2 WINS!';
+      byId('overlay').style.display='flex';
+      play('s-win');
+      startFireworks();
+    }
+
+    render();
+
+    // ---------- STARFIELD (slow drifting) ----------
+    const starCanvas = byId('starfield');
+    const sctx = starCanvas.getContext('2d');
+    let stars=[]; let starRunning=true;
+    function resizeStar(){ starCanvas.width = innerWidth; starCanvas.height = innerHeight; }
+    addEventListener('resize', resizeStar); resizeStar();
+    function initStars(){
+      const count = Math.min(300, Math.floor((innerWidth*innerHeight)/6000));
+      stars = Array.from({length:count}, ()=>({
+        x: Math.random()*starCanvas.width,
+        y: Math.random()*starCanvas.height,
+        r: Math.random()*1.5+0.2,
+        a: Math.random()*0.6+0.2,
+        dx: (Math.random()-.5)*0.15,
+        dy: (Math.random()-.5)*0.15,
+        tw: Math.random()*Math.PI*2
+      }));
+    }
+    initStars();
+    function starLoop(){
+      if(!starRunning) return;
+      sctx.clearRect(0,0,starCanvas.width,starCanvas.height);
+      for(const s of stars){
+        s.x += s.dx; s.y += s.dy; s.tw += 0.02;
+        if(s.x<0) s.x=starCanvas.width; if(s.x>starCanvas.width) s.x=0;
+        if(s.y<0) s.y=starCanvas.height; if(s.y>starCanvas.height) s.y=0;
+        const alpha = s.a + Math.sin(s.tw)*0.15;
+        sctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+        sctx.beginPath(); sctx.arc(s.x,s.y,s.r,0,Math.PI*2); sctx.fill();
+      }
+      requestAnimationFrame(starLoop);
+    }
+    starLoop();
+
+    // ---------- FIREWORKS (front of overlay) ----------
+    const fw = byId('fireworks');
+    const fctx = fw.getContext('2d');
+    function sizeFW(){ fw.width=innerWidth; fw.height=innerHeight; }
+    addEventListener('resize', sizeFW); sizeFW();
+    let fwParticles=[]; let fwTimer=null; let fwRunning=false;
+
+    function spawnFirework(){
+      const x = Math.random()*fw.width*0.9 + fw.width*0.05;
+      const y = Math.random()*fw.height*0.6 + fw.height*0.1;
+      const hue = Math.random()*360;
+      const count = 90;
+      for(let i=0;i<count;i++){
+        const angle = (i/count)*Math.PI*2;
+        const speed = 2 + Math.random()*3.5;
+        fwParticles.push({x,y, vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed, life:80+Math.random()*30, hue, alpha:1});
+      }
+    }
+
+    function drawFW(){
+      if(!fwRunning) return;
+      fctx.clearRect(0,0,fw.width,fw.height);
+      for(let i=fwParticles.length-1;i>=0;i--){
+        const p = fwParticles[i];
+        p.x += p.vx; p.y += p.vy; p.vy += 0.02; // gravity
+        p.life -= 1; p.alpha = Math.max(0, p.life/110);
+        fctx.fillStyle = `hsla(${p.hue},100%,60%,${p.alpha})`;
+        fctx.fillRect(p.x,p.y,2,2);
+        if(p.life<=0) fwParticles.splice(i,1);
+      }
+      requestAnimationFrame(drawFW);
+    }
+
+    function startFireworks(){
+      fwRunning = true; drawFW();
+      fwTimer = setInterval(spawnFirework, 700);
+    }
+    function stopFireworks(){
+      fwRunning = false; clearInterval(fwTimer); fctx.clearRect(0,0,fw.width,fw.height); fwParticles=[];
+    }
+  </script>
 </body>
 </html>
